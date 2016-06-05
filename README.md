@@ -5,8 +5,7 @@ Predict heart volume using a CNN model trained over MRI images of 500 patients
 Change the directory in the notebook to a single view of a patient in  your training data directory. The notebook will print the images and the systolic and diastolic images in the set of 30 images in that view.
 
 # data\_input.py
-Use this as follows:
-python data_\input.py <path_to_dataset> <path_to_label> <path_to_output> <mode>
+python data\_input.py <\path\_to\_dataset> <\path\_to\_label> <\path\_to\_output> <\mode>
 Inputs:
 path_to_dataset: Path to input dataset is stored in the same format as provided on kaggle. ie 1/study/<views>/<images>
 path_to_label: Path to input labels in csv format
