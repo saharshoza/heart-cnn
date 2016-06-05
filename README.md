@@ -1,5 +1,5 @@
 # heart-cnn
-Predict heart volume using a CNN model trained over MRI images of 500 patients
+Predict heart volume using a CNN model trained over MRI images of 500 patients. A detailed explanation of all the steps involved can be found at http://saharshoza.github.io/heart-cnn/
 
 # ViewImages.ipynb
 Change the directory in the notebook to a single view of a patient in  your training data directory. The notebook will print the images and the systolic and diastolic images in the set of 30 images in that view.
@@ -30,4 +30,25 @@ The final set of 8 is stored in path\_to\_output/labelled\_data
 Inputs: input\_csv is the path to csv stored in labelled\_data/ after data\_input.py
         path to output_npy where mean of the dataset must be stored 
 
- 
+# ViewExtractedFeatures.ipynb
+Use the notebook to visualize the features at any layer of the VGG\_ILSVRC\_19\_layers pre trained net 
+
+# extract\_features.py
+`python extract_features.py <caffe_path> <root_path_to_labelled_data> <path_to_pretrained_weights> <path_to_model> <number_of_examples>`  
+Input: caffe\_path: path to the caffe root folder  
+       root_path: path to which the output of data_input.py was stored  
+       path_to_pretrained_weights: path will be typically be models/<model_dir>/<Huge file you downloaded>  
+       path_to_model: path to the deploy.prototxt Change the number of examples in the deploy.prototxt to 50 for this code to work  
+       number_of_examples: 500 in the case of train and 200 for validation in this dataset  
+Output: Save the extracted features as Systole.h5 and Diastole.h5 in root\_path\_to\_labelled\_data/extracted\_feat  
+
+# get\_labels.py
+`python get_labels.py <input_path_to_labelled_data> <output_path_to_labels>`  
+Use this to store the labels of the images in hdf5 format
+
+# keras\_model.py
+`python keras_model.py <path_to_input> <path_to_output> <mode>`  
+Input: path\_to\_input: path to the directory where extracted\_feat and labels are stored  
+       path_to_output: path where train, val loss, test prediction for each model will be stored  
+       mode: test or train  
+Output: Store arrays for the train and validation loss at each iteration along with the actual versus predicted for validation images  
