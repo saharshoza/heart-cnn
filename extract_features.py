@@ -4,6 +4,7 @@
 #	 path_to_pretrained_weights: path will be typically be models/<model_dir>/<Huge file you downloaded>
 #	 path_to_model: path to the deploy.prototxt Change the number of examples in the deploy.prototxt to 50 for this code to work
 #	 number_of_examples: 500 in the case of train and 200 for validation in this dataset
+# Output: Save the extracted features as Systole.h5 and Diastole.h5 in root_path_to_labelled_data/extracted_feat
 
 import numpy as np
 import cv2
