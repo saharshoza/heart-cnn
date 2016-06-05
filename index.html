@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>Heart-cnn by saharshoza</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name">Heart-cnn</h1>
+      <h2 class="project-tagline">Predict heart volume using a CNN model trained over MRI images of 500 patients</h2>
+      <a href="https://github.com/saharshoza/heart-cnn" class="btn">View on GitHub</a>
+      <a href="https://github.com/saharshoza/heart-cnn/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/saharshoza/heart-cnn/tarball/master" class="btn">Download .tar.gz</a>
+    </section>
+
+    <section class="main-content">
+      <p>I recently completed the <a href="http://cs231n.stanford.edu/">cs231n</a> course and wanted to implement some of the things I learnt. So I turned to this <a href="http://cs231n.stanford.edu/reports2016/331_Report.pdf">report</a> on predicting heart volumes from a MRI image dataset of 500 patients. This post will outline how I set up the model on a remote machine and interpreted the results.</p>
+
+<h1>
+<a id="overview" class="anchor" href="#overview" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Overview</h1>
+
+<p>The network will extract features from an existing caffe model and train a CNN network on these enriched features instead of the raw images directly. The data is structured as follows. Each patient has MRI scans taken from multiple views. Each view has 30 images each. There are 500 such patients. The number of views can vary across patients, but averages at around 11. The labels provided contain the actual volume for systole and diastole for each patient. So 1 label for every (10x30) images. The process of assigning this label to images is explained in detail <a href="http://cs231n.stanford.edu/reports2016/331_Report.pdf">here</a>. But the idea is to:</p>
+
+<ol>
+<li>Identify the systole and diastole image by measuring the brightness of the image (brightest is systole and vice versa). So 1 for systole and 1 for diastole from each view.</li>
+<li>Bucket the views into 4 categories. Randomly pick one of the images selected from 1 across all views in each bucket.</li>
+<li>Concatenate the images and assign that label to each concatenated image.</li>
+</ol>
+
+<h2>
+<a id="download-the-dataset" class="anchor" href="#download-the-dataset" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Download the Dataset</h2>
+
+<p>First, download the dataset from kaggle. Its a little tricky to do this on a remote server as there is no javascript support and hence no browser to download. To circumvent this, you need to do the following:</p>
+
+<ol>
+<li>Download <a href="https://chrome.google.com/webstore/detail/cookiestxt/njabckikapfpffapmjgojcnbfjonfjfg?hl=en">this</a> chrome extension.</li>
+<li>Login to kaggle and visit <a href="https://www.kaggle.com/c/second-annual-data-science-bowl/data">this</a> page hosting the dataset.</li>
+<li>Get the cookies from the extension and save it in your remote machine in <code>$PROJECT_PATH/train_data/cookies.txt</code>
+</li>
+<li>Inside <code>$PROJECT_PATH/train_data</code> directory <code>nohup wget --load-cookies cookies.txt https://www.kaggle.com/c/second-annual-data-science-bowl/download/train.zip &amp;</code>
+</li>
+<li>Do the same for the labelled data as well.</li>
+</ol>
+
+<h2>
+<a id="setup-the-ipython-server" class="anchor" href="#setup-the-ipython-server" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Setup the ipython server</h2>
+
+<p>Next, you'd have to set up ipython so that you can view the images and visualize the data. This <a href="https://ipython.org/ipython-doc/1/interactive/public_server.html">tutorial</a> gives a detailed breakdown of the steps involved. To view the notebook, ssh into the machine as follows: 
+<code>ssh -X -L localhost:8888:localhost:&lt;port defined in ipython config&gt; ubuntu@&lt;ip_address&gt;</code> 
+The <code>-X</code> allows you to view images from the remote machine on your local. Now, execute <code>jupyter notebook --no-browser</code> on the remote machine and open <code>localhost:8888/</code> on the browser of your local machine.</p>
+
+<h2>
+<a id="view-the-images" class="anchor" href="#view-the-images" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>View the images</h2>
+
+<p>To get a sense of the data I first decided to view a few of the images and see if the heuristic of brightness gives a good approximation of systolic and diastolic heart images in a set of 30 in each view. I used otsu thresholding to compute this brightness. <a href="https://github.com/saharshoza/heart-cnn/blob/master/ViewImages.ipynb">This notebook</a> shows the images chosen as systolic and diastolic from the 30 images in a view. You will need ImageMagick installed on your remote machine for this.</p>
+
+<h2>
+<a id="image-selection" class="anchor" href="#image-selection" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Image Selection</h2>
+
+<p>As discussed in the Overview, 4 images for systole and 4 for diastole have to be chosen for every patient. The first step of identifying systole and diastole was covered above. Next, for the view buckets. <code>ch</code> views form 1 bucket whereas all the <code>sax</code> views form 3 buckets. For this, I sorted the sax views in ascending order and split this into 3 equal groups. Then I picked one image at random from each of these buckets and arrived at 4 images for systole and diastole each. <a href="https://github.com/saharshoza/heart-cnn/blob/master/data_input.py">This python script</a> walks through these steps. It should be used as follows: <code>python data_input.py &lt;path_to_dataset&gt; &lt;path_to_label&gt; &lt;path_to_output&gt; &lt;mode&gt;</code></p>
+
+<h2>
+<a id="extract-features-using-caffe" class="anchor" href="#extract-features-using-caffe" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Extract features using caffe</h2>
+
+<h3>
+<a id="install-caffe-and-download-model" class="anchor" href="#install-caffe-and-download-model" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Install Caffe and download model</h3>
+
+<p>First, install caffe and specifically, get pycaffe to work. I used this <a href="http://installing-caffe-the-right-way.wikidot.com/start">tutorial</a>. The premise of extracting features is that you take an existing model with pre trained weights and get the features for your images at a layer you choose in this model. Specifically, you take a model X with 20 layers. Then pass your training data to it and collect the output at say the 15th layer. Now that you have enriched features instead of raw images, you only need to train a few layers from scratch. I decided to follow <a href="http://cs231n.stanford.edu/reports2016/331_Report.pdf">this report</a> and used the <a href="https://gist.github.com/ksimonyan/3785162f95cd2d5fee77">VGG_ILSVRC_19_layers</a> model. Steps on how to get the model are explained <a href="https://github.com/BVLC/caffe/wiki/Model-Zoo">here</a>. Just one catch, to enable  <code>download_model_binary.py</code> to parse the readme.md, the following changes have to be made to it:
+Add <code>---</code> before <code>name:</code> and after <code>gist_id:</code>. This identifier tells the parser to start and stop parsing at these lines
+Next add <code>sha1:</code> after <code>gist_id:</code>. The <code>download_model_binary.py</code> script will throw an error if this field is missing. </p>
+
+<h3>
+<a id="view-the-extracted-features" class="anchor" href="#view-the-extracted-features" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>View the extracted features</h3>
+
+<p>Before we extract features for all the images, it is instructive to view what these ‘features’ will look like. I wasn’t able to draw too many conclusions from them. But it helped me get a feel of what I was really extracting from the caffe model. I slightly modified an <a href="http://nbviewer.jupyter.org/github/BVLC/caffe/blob/master/examples/00-classification.ipynb">existing python notebook</a> that does the same for a different model (with more interpretable results). A link to a similar notebook for this project can be found <a href="https://github.com/saharshoza/heart-cnn/blob/master/ViewExtractedFeatures.ipynb">here</a>. It will require you to obtain the mean of each of the 8 image sets first. I did so using <a href="https://github.com/saharshoza/heart-cnn/blob/master/get_mean.py">this python script</a>.</p>
+
+<h3>
+<a id="obtain-and-store-extracted-features-for-all-images" class="anchor" href="#obtain-and-store-extracted-features-for-all-images" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Obtain and store extracted features for all images</h3>
+
+<p>Now that we have visualized the features, we can perform this forward pass for all images and store it as inputs for the model we create. I stored the output in hdf5 format using the python library tables. I also concatenate the features extracted from images from each of the 4 buckets of size (512x14x14) here and store it as a single image that is (512x28x28). The code for doing this is <a href="https://github.com/saharshoza/heart-cnn/blob/master/extract_features.py">here</a>. You will have to change the VGG_ILSVRC_19_layers_deploy.prototxt to read 50 examples. (I would have preferred more, but I ran out of memory at 100)</p>
+
+<h2>
+<a id="train-your-network" class="anchor" href="#train-your-network" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Train your network</h2>
+
+<h3>
+<a id="store-labels-in-a-separate-npy-file" class="anchor" href="#store-labels-in-a-separate-npy-file" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Store labels in a separate npy file</h3>
+
+<p>I used a separate <a href="https://github.com/saharshoza/heart-cnn/blob/master/get_labels.py">python script</a> to do this. By this step the <code>root_input_path</code> should contain the following directories:</p>
+
+<ol>
+<li>max_min_select</li>
+<li>random_select</li>
+<li>labelled_data</li>
+<li>mean_image</li>
+<li>extracted_feat</li>
+<li>labels</li>
+</ol>
+
+<h3>
+<a id="finally-lets-train" class="anchor" href="#finally-lets-train" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Finally, lets train</h3>
+
+<p>Some of the code in the above section and almost all the code in this section is from <a href="https://github.com/jocicmarko/kaggle-dsb2-keras">this project</a>. I decided to iterate over 3 choices of models. Each new model adds an extra layer of convolution. The script that does this is <a href="https://github.com/saharshoza/heart-cnn/blob/master/keras_model.py">here</a>. Model1 has 1 CNN layer, model2 has 2 CNN layers and model3 has 3 of them. Each layer has dropout.</p>
+
+<h2>
+<a id="test-your-network" class="anchor" href="#test-your-network" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Test your network</h2>
+
+<p>Run data_input.py followed by extract_features.py to obtain the necessary input for the model. Now run the keras_model.py in test mode to obtain actual versus predicted arrays.</p>
+
+<h1>
+<a id="results" class="anchor" href="#results" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Results</h1>
+
+<p>Using the output stored from the keras_model.py script, we can plot the following for each of the models:</p>
+
+<ol>
+<li>Train/Validation loss across iterations</li>
+<li>Actual versus predicted volume for validation data.</li>
+</ol>
+
+<h2>
+<a id="model1" class="anchor" href="#model1" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Model1:</h2>
+
+<ol>
+<li><p>Training versus Validation Loss
+<img src="https://github.com/saharshoza/heart-cnn/blob/master/output/model1/model1_loss.png?raw=true" alt="Train versus Validation loss"></p></li>
+<li><p>Actual versus Predicted Systole Validation Dataset
+<img src="https://github.com/saharshoza/heart-cnn/blob/master/output/model1/model1_systole_val.png?raw=true" alt="Actual versus Predicted Systole Validation Dataset"></p></li>
+<li><p>Actual versus Predicted Diastole Validation Dataset
+<img src="https://github.com/saharshoza/heart-cnn/blob/master/output/model1/model1_diastole_val.png?raw=true" alt="Actual versus Predicted Systole Validation Dataset"></p></li>
+</ol>
+
+<h2>
+<a id="model2" class="anchor" href="#model2" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Model2:</h2>
+
+<ol>
+<li><p>Training versus Validation Loss
+<img src="https://github.com/saharshoza/heart-cnn/blob/master/output/model2/model2_loss.png?raw=true" alt="Train versus Validation loss"></p></li>
+<li><p>Actual versus Predicted Systole Validation Dataset
+<img src="https://github.com/saharshoza/heart-cnn/blob/master/output/model2/model2_systole_val.png?raw=true" alt="Actual versus Predicted Systole Validation Dataset"></p></li>
+<li><p>Actual versus Predicted Diastole Validation Dataset
+<img src="https://github.com/saharshoza/heart-cnn/blob/master/output/model2/model2_diastole_val.png?raw=true" alt="Actual versus Predicted Systole Validation Dataset"></p></li>
+</ol>
+
+<h2>
+<a id="model3" class="anchor" href="#model3" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Model3:</h2>
+
+<ol>
+<li><p>Training versus Validation Loss
+<img src="https://github.com/saharshoza/heart-cnn/blob/master/output/model3/model3_loss.png?raw=true" alt="Train versus Validation loss"></p></li>
+<li><p>Actual versus Predicted Systole Validation Dataset
+<img src="https://github.com/saharshoza/heart-cnn/blob/master/output/model3/model3_systole.png?raw=true" alt="Actual versus Predicted Systole Validation Dataset"></p></li>
+<li><p>Actual versus Predicted Diastole Validation Dataset
+<img src="https://github.com/saharshoza/heart-cnn/blob/master/output/model3/model3_diastole.png?raw=true" alt="Actual versus Predicted Systole Validation Dataset"></p></li>
+</ol>
+
+<h1>
+<a id="observations" class="anchor" href="#observations" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Observations</h1>
+
+<ol>
+<li>In all 3 models, the validation loss for systole and diastole more or less plateaued after 20-25 iterations although the train loss kept reducing till around 150 iterations. I guess the model was heavily overfitting since the training was on only 400 images (80/20 train/test split of the 500 in total), each with (512x28x28) features.</li>
+<li>More layers didn't help. The graph suggests that training for more iterations may have reduced the training loss of model3. But the validation loss didn't show any downward slope. </li>
+<li>Interestingly, diastole gave significantly worse loss than systole in each of the models.</li>
+<li>Model1 did a fairly good job with figuring out the average weight of systole and diastole in the validation dataset. It doesn't do so good with huge outliers, but gives a fairly decent approximation for variations around the average.</li>
+</ol>
+
+      <footer class="site-footer">
+        <span class="site-footer-owner"><a href="https://github.com/saharshoza/heart-cnn">Heart-cnn</a> is maintained by <a href="https://github.com/saharshoza">saharshoza</a>.</span>
+
+        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
+      </footer>
+
+    </section>
+
+  
+  </body>
+</html>
