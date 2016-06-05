@@ -23,3 +23,11 @@ Each folder contains 8 csv files.
 sax1\_max.csv, sax2\_max.csv, sax3\_max.csv, ch\_max.csv for diastole  
 sax1\_min.csv, sax2\_min.csv, sax3\_min.csv, ch\_min.csv for systole  
 The final set of 8 is stored in path\_to\_output/labelled\_data  
+
+# get\_mean.py
+`python get_mean.py <input_csv1> <output_npy1> <input_csv2> <output_npy2> ...`  
+
+Inputs: input\_csv is the path to csv stored in labelled\_data/ after data\_input.py
+        path to output_npy where mean of the dataset must be stored 
+
+ 
